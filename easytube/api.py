@@ -98,6 +98,10 @@ class Playlist(YouTubeResource):
     def player(self) -> str:
         return self.player
 
+    @property
+    def videos(self) -> List[Video]:
+        return get_videos()
+
     def __init__(self, service: Resource, kind: str, id: str, etag: str, title: str, description: str, channel_id: str,
                  channel_title: str, published_at: str, thumbnails: List[Thumbnail], localized: str, status: str,
                  num_videos: int, player: str) -> None:
@@ -330,4 +334,5 @@ class YouTube(object):
         return self.channel(id)
 
     def playlist(self, id: str) -> Playlist:
-        get_playlists(self.__service, )
+        playlists = get_playlists(self.__service, playlist_id=id)
+        return Playlist.from_dict(self.__service, playlists[0]) if playlists else None

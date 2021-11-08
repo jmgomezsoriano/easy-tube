@@ -17,10 +17,13 @@ class MyTestCase(unittest.TestCase):
         youtube = YouTube('youtube-oath2-credentials.json', 'my-oauth2.json')
         channel = youtube.channel('UCo_fg5ZyCCHt75ryUUa6ebw')
         self.assertGreaterEqual(len(channel.playlists), 4)
+        self.assertEqual(youtube.playlist('PLmf8nIhY4ISvHi1tUiZqEYjEiI185nzJH').title, 'Programación')
 
     def test_get_videos(self) -> None:
         youtube = YouTube('youtube-oath2-credentials.json', 'my-oauth2.json')
-        channel = youtube.channel('UCo_fg5ZyCCHt75ryUUa6ebw')
+        playlist = youtube.playlist('PLmf8nIhY4ISvHi1tUiZqEYjEiI185nzJH')
+        self.assertGreaterEqual(playlist.num_videos, 26)
+        print(playlist.videos)
 
 
 
