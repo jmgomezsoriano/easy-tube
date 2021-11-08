@@ -1,6 +1,7 @@
 import unittest
 
 from easytube import YouTube
+from easytube.utils import get_authenticated_service, get_playlist_videos
 
 
 class MyTestCase(unittest.TestCase):
@@ -20,11 +21,15 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(youtube.playlist('PLmf8nIhY4ISvHi1tUiZqEYjEiI185nzJH').title, 'Programación')
 
     def test_get_videos(self) -> None:
+        service = get_authenticated_service('youtube-oath2-credentials.json', 'my-oauth2.json')
         youtube = YouTube('youtube-oath2-credentials.json', 'my-oauth2.json')
         playlist = youtube.playlist('PLmf8nIhY4ISvHi1tUiZqEYjEiI185nzJH')
-        self.assertGreaterEqual(playlist.num_videos, 26)
-        print(playlist.videos)
-
+        self.assertEqual(playlist.title, 'Programación')
+        print(get_playlist_videos(service, 'PLmf8nIhY4ISvHi1tUiZqEYjEiI185nzJH'))
+        # youtube = YouTube('youtube-oath2-credentials.json', 'my-oauth2.json')
+        # playlist = youtube.playlist('PLmf8nIhY4ISvHi1tUiZqEYjEiI185nzJH')
+        # self.assertGreaterEqual(playlist.num_videos, 26)
+        # print(playlist.videos)
 
 
 if __name__ == '__main__':

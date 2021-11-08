@@ -1,5 +1,5 @@
 from os import PathLike
-from typing import List, Union
+from typing import List, Union, Optional
 
 from httplib2 import Http
 from oauth2client.client import flow_from_clientsecrets
@@ -15,7 +15,7 @@ YOUTUBE_API_SERVICE_NAME = "youtube"
 YOUTUBE_API_VERSION = "v3"
 
 
-def error_msg(client_secrect_file: str) -> str:
+def error_msg(client_secret_file: str) -> str:
     # This variable defines a message to display if the CLIENT_SECRETS_FILE is
     # missing.
     return f"""
@@ -24,7 +24,7 @@ def error_msg(client_secrect_file: str) -> str:
     To make this sample run you will need to populate the client_secrets.json file
     found at:
 
-       {client_secrect_file}
+       {client_secret_file}
 
     with information from the API Console
     https://console.developers.google.com/
@@ -57,17 +57,16 @@ def get_channels(service: Resource, user_name: str = None, channel_id: str = Non
         params['id'] = channel_id
     else:
         params['mine'] = True
-    channels = service.channels().list(maxResults=max_results if max_results else 50, **params).execute()
-    results = []
-    while True:
-        if 'items' not in channels:
-            return results
-        results.extend([item for item in channels['items']])
-        if 'pageToken' not in channels or (max_results and max_results < len(results)):
-            return results
-        page_token = channels['pageToken']
-        channels = service.channels().list(maxResults=max_results - len(results) if max_results else 50, **params,
+    response = service.channels().list(maxResults=max_results or 50, **params).execute()
+    channels = []
+    while 'items' in response:
+        channels.extend([item for item in response['items']])
+        if 'pageToken' not in response or (max_results and max_results < len(channels)):
+            return channels
+        page_token = response['pageToken']
+        response = service.channels().list(maxResults=max_results - len(channels) if max_results else 50, **params,
                                            pageToken=page_token).execute()
+    return channels
 
 
 def get_playlists(service: Resource,
@@ -79,30 +78,65 @@ def get_playlists(service: Resource,
         params['channelId'] = channel_id
     elif playlist_id:
         params['id'] = playlist_id
-    playlists = service.playlists().list(maxResults=max_results if max_results else 50, **params).execute()
-    results = []
-    while True:
-        results.extend([item for item in playlists['items']])
-        if 'pageToken' not in playlists or (max_results and max_results < len(results)):
-            return results
-        page_token = playlists['nextPageToken']
-        playlists = service.playlists().list(maxResults=max_results - len(results) if max_results else 50,
-                                             pageToken=page_token, **params).execute()
+    playlists = []
+    response = service.playlists().list(maxResults=max_results or 50, **params).execute()
+    while 'items' in response:
+        playlists.extend([item for item in response['items']])
+        if 'nextPageToken' not in response or (max_results and max_results < len(playlists)):
+            return playlists
+        page_token = response['nextPageToken']
+        response = service.playlists().list(maxResults=max_results - len(playlists) if max_results else 50,
+                                            pageToken=page_token, **params).execute()
+    return playlists
 
 
 def get_videos(service: Resource,
                channel_id: str = None,
                playlist_id: str = None,
+               *ids: str,
                max_results: int = 0) -> List[dict]:
-    params = {'part': 'id,snippet,contentDetails,fileDetails,player,processingDetails,'
-                      'recordingDetails,statistics,status,suggestions,topicDetails'}
-    results = []
+    part = 'id,snippet,contentDetails,fileDetails,player,processingDetails,' \
+           'recordingDetails,statistics,status,suggestions,topicDetails'
+    videos = []
     if channel_id:
-        params['channelId'] = channel_id
+        pass
     elif playlist_id:
-        params['id'] = playlist_id
+        pass
+    else:
+        return [get_video(service, id) for id in ids]
+
+    #     response = service.videos().list(part=part, maxResults=max_results or 50, id=','.join(id))
+    #     while 'items' in response:
+    #         videos.extend([item for item in response['items']])
+    #         if 'nextPageToken' not in response or (max_results and max_results < len(videos)):
+    #             return videos
+    #         page_token = response['nextPageToken']
+    #         response = service.videos().list(maxResults=max_results - len(videos) if max_results else 50,
+    #                                          pageToken=page_token, part=part).execute()
+    # return videos
 
 
-def get_video(service: Resource, id: str) -> dict:
-    videos = service.videos().list(maxResults=1, id=id)
+def get_video(service: Resource, id: str, mine: bool = False) -> dict:
+    part = 'id,snippet,contentDetails,player,statistics,status,topicDetails'
+    part += ',fileDetails,processingDetails,recordingDetails,suggestions,' if mine else ''
+    videos = service.videos().list(part=part, maxResults=1, id=id).execute()
     return videos['items'][0] if 'items' in videos else None
+
+
+def get_playlist_videos(service: Resource, id: str, max_results: int = 0) -> List[dict]:
+    ids = get_playlist_video_ids(service, id, max_results)
+    return get_videos(service, None, None, max_results=max_results, *ids)
+
+
+def get_playlist_video_ids(service: Resource, id: str, max_results: int = 0) -> List[str]:
+    part = 'id,snippet'  #,contentDetails,status'
+    items = service.playlistItems().list(part=part, playlistId=id, maxResults=max_results or 50).execute()
+    videos = []
+    while 'items' in items:
+        videos.extend([item for item in items['items']])
+        if 'nextPageToken' not in items or (max_results and max_results < len(videos)):
+            return [v['snippet']['resourceId']['videoId'] for v in videos]
+        page_token = items['nextPageToken']
+        items = service.playlistItems().list(maxResults=max_results - len(videos) if max_results else 50,
+                                             part=part, playlistId=id, pageToken=page_token).execute()
+    return [v['snippet']['resourceId']['videoId'] for v in videos]
