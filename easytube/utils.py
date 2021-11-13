@@ -120,7 +120,7 @@ def get_video(service: Resource, id: str, mine: bool = False) -> dict:
     part = 'id,snippet,contentDetails,player,statistics,status,topicDetails'
     part += ',fileDetails,processingDetails,recordingDetails,suggestions,' if mine else ''
     videos = service.videos().list(part=part, maxResults=1, id=id).execute()
-    return videos['items'][0] if 'items' in videos else None
+    return videos['items'][0] if 'items' in videos and videos['items'] else None
 
 
 def get_playlist_videos(service: Resource, id: str, max_results: int = 0) -> List[dict]:

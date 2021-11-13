@@ -85,17 +85,16 @@ class Video(ItemYouTubeResource, Playable):
         return self.__made_for_kids
 
     @property
-    def statistics(self) -> Statistics:
-        return self.__statistics
-
-    @property
     def topic_categories(self) -> List[str]:
         return self.__topic_categories
 
     @property
     def channel(self) -> Optional['Channel']:
-        channels = get_channels(self._service, channel_id=self.channel_id, max_results=1)
-        return Channel.from_dict(self._service, channels[0]) if channels else None
+        if self.__channel:
+            return self.__channel
+        channels = self.__channel or get_channels(self._service, channel_id=self.channel_id, max_results=1)
+        self.__channel = Channel.from_dict(self._service, channels[0]) if channels else None
+        return self.__channel
 
     def __init__(self, service: Resource, kind: str, id: str, etag: str, title: str, description: str,
                  published_at: str, thumbnails: List[Thumbnail], channel_id: str, channel_title: str,
@@ -126,9 +125,13 @@ class Video(ItemYouTubeResource, Playable):
         self.__public_stats_viewable = public_stats_viewable
         self.__made_for_kids = made_for_kids
         self.__topic_categories = topic_categories
+        self.__channel = None
+        self.__playlists = None
 
     @staticmethod
-    def from_dict(service: Resource, d: dict) -> 'Video':
+    def from_dict(service: Resource, d: dict) -> Optional['Video']:
+        if not d:
+            return None
         view_count = int(d['statistics']['viewCount'])
         like_count = int(d['statistics']['likeCount'])
         dislike_count = int(d['statistics']['dislikeCount'])
@@ -275,7 +278,7 @@ class Playlist(IterableYouTubeResource, Playable):
         return f'{self.kind}{self.id, self.title, self.status}'
 
 
-class Channel(ItemYouTubeResource, Iterable):
+class Channel(IterableYouTubeResource):
     @staticmethod
     def from_url(service: Resource, url: str) -> YouTubeResource:
         pass
@@ -305,7 +308,10 @@ class Channel(ItemYouTubeResource, Iterable):
 
     @property
     def playlists(self) -> List[Playlist]:
-        return [Playlist.from_dict(self._service, d) for d in get_playlists(self._service, self.id)]
+        if self.__playlists:
+            return self.__playlists
+        self.__playlists = [Playlist.from_dict(self._service, d) for d in get_playlists(self._service, self.id)]
+        return self.__playlists
 
     @property
     def url(self) -> str:
@@ -319,6 +325,7 @@ class Channel(ItemYouTubeResource, Iterable):
         self.__likes = likes
         self.__uploads = uploads
         self.__topics = topics
+        self.__playlists = None
 
     @staticmethod
     def from_dict(service: Resource, d: dict) -> 'Channel':
@@ -357,7 +364,13 @@ class Channel(ItemYouTubeResource, Iterable):
 
 
 class YouTube(object):
+    """ A class that represents the YouTube connection. """
     def __init__(self, client_secret_file: Union[str, PathLike, bytes], authorization: [str, PathLike, bytes]) -> None:
+        """ Create a new YouTube connection.
+
+        :param client_secret_file: The secret file obtained from the
+        :param authorization:
+        """
         self.__service = get_authenticated_service(client_secret_file, authorization)
 
     def first_channel(self, user_name: str = None) -> Channel:
@@ -381,3 +394,6 @@ class YouTube(object):
     def playlist(self, id: str) -> Playlist:
         playlists = get_playlists(self.__service, playlist_id=id)
         return Playlist.from_dict(self.__service, playlists[0]) if playlists else None
+
+    def video_from_id(self, id: str) -> Optional[Video]:
+        return Video.from_dict(self.__service, get_video(self.__service, id))

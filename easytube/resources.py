@@ -10,14 +10,14 @@ class YouTubeResource(ABC):
 
     @property
     def kind(self) -> str:
-        """
-        :return: The kind of the resource.
+        """ Identifies what kind of resource this is.
+        :return: An string identifier.
         """
         return self.__kind
 
     @property
     def id(self) -> str:
-        """
+        """ Identifies the YouTube resource.
         :return: The resource id.
         """
         return self.__id
